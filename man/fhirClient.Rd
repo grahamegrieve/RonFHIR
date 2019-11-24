@@ -10,14 +10,23 @@ Based on \href{https://github.com/ewoutkramer/fhir-net-api}{the official HL7 FHI
 \section{Usage}{
 
 \preformatted{
-client <- fhirClient$new(endpoint)
+client <- fhirClient$new(endpoint, token = NULL)
 
-client$read(location, summaryType = NULL)
-client$search(resourceType, criteria = NULL, includes = NULL, pageSize = NULL, summaryType = NULL)
-client$searchById(resourceType, id, includes = NULL, summaryType = NULL)
-client$wholeSystemSearch(criteria = NULL, includes = NULL, pageSize = NULL, summaryType = NULL)
-client$searchParams(params, resourceType = NULL)
+client$read(location, summaryType = NULL, returnType = "parsed")
+client$search(resourceType, criteria = NULL, includes = NULL, pageSize = NULL, summaryType = NULL, returnType = "parsed")
+client$searchById(resourceType, id, includes = NULL, summaryType = NULL, returnType = "parsed")
+client$wholeSystemSearch(criteria = NULL, includes = NULL, pageSize = NULL, summaryType = NULL, returnType = "parsed")
+client$searchParams(params, resourceType = NULL, returnType = "parsed")
 client$continue(bundle)
+
+
+client$setToken(token)
+
+client$endpoint
+client$authUrl
+client$tokenUrl
+client$registerUrl
+client$token
 
 print(client)
 }
@@ -28,6 +37,7 @@ print(client)
 \describe{
   \item{client}{A \code{fhirClient} object.}
   \item{endpoint}{The URL of the server to connect to.}
+  \item{token}{An ouath 2.0 Token (httr Token 2.0)}
   \item{resourceType}{The type of resource to search for.}
   \item{id}{The id of the Resource to search for.}
   \item{summaryType}{Whether to include only return a summary of the Resource(s).}
@@ -37,6 +47,7 @@ print(client)
   \item{pageSize}{Asks server to limit the number of entries per page returned.}
   \item{query}{A searchParams object containing the search parameters.}
   \item{bundle}{The bundle as received from the last response.}
+  \item{returnType}{Specify the return type. This can be "parsed", "json" or "xml".}
 }
 }
 
@@ -57,13 +68,25 @@ If the endpoint does not end with a slash (/), it will be added.
 
 \code{$continue()} Uses the FHIR paging mechanism to go navigate around a series of paged result Bundles.
 
+\code{$setToken()} Saves an Oauth 2.0 token in a variable.
+
+\code{$endpoint} Returns the endpoint.
+
+\code{$authUrl} Returns the authorization server’s OAuth authorization endpoint.
+
+\code{$tokenUrl} Returns the authorization server’s OAuth token endpoint.
+
+\code{$registerUrl} Returns the endpoint where the client can register.
+
+\code{$token} Returns the initialized token.
+
 \code{print(p)} or \code{p$print()} Shows which endpoint is configured.
 }
 
 \examples{
 \dontrun{
 # Setting up a fhirClient
-client <- fhirClient$new("http://vonk.furore.com")
+client <- fhirClient$new("https://vonk.fire.ly")
 # Read
 client$read("Patient/example")
 
@@ -74,6 +97,35 @@ while(!is.null(bundle)){
    # Do something useful
    bundle <- client$continue(bundle)
 }
+}
+\dontrun{
+# Using Oauth 2.0
+client <- fhirClient$new("https://vonk.fire.ly")
+
+# Retrieving a token
+
+client_id <- "id"
+client_secret <- "secret"
+app_name <- "TestApp"
+scopes <- c("patient/*.read")
+
+app <- httr::oauth_app(appname = app_name, client_id, client_secret)
+oauth_endpoint <- httr::oauth_endpoint(
+                  authorize = paste(client$authUrl, "?aud=", client$endpoint, sep=""),
+                  access = client$tokenUrl)
+  
+token <- httr::oauth2.0_token(endpoint = oauth_endpoint, app = app, scope = scopes)
+
+# Set a token and read a patient resource
+client$setToken(token$credentials$access_token)
+
+client$read("Patient/example")
+
+# Token refresh
+token <- token$refresh()
+
+client$setToken(token$credentials$access_token)
+
 }
 
 }
